@@ -1,1 +1,5 @@
-spring.application.name=StoreBonus
+spring:
+  profiles:
+    active: local
+  application:
+    name: StoreBonus
