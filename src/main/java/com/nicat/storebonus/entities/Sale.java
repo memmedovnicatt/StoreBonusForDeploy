@@ -32,6 +32,9 @@ public class Sale extends BaseEntity {
     Employer employer;
 
     //market_id
+    @ManyToOne
+    @JoinColumn(name = "market_id")
+    Market market;
 
     Date date;
     BigDecimal price;
