@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.Date;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -19,11 +20,7 @@ import java.util.Date;
 @Entity
 @Table(name = "employer_salaries")
 @EntityListeners(AuditingEntityListener.class)
-public class EmployerSalary {
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    Long id;
-
+public class EmployerSalary extends BaseEntity {
     Date validFrom;
 
     Date validTo;
@@ -37,10 +34,4 @@ public class EmployerSalary {
     Employer employer;
 
     //market_id
-
-    @CreatedDate
-    LocalDateTime createdAt;
-
-    @LastModifiedDate
-    LocalDateTime updatedAt;
 }
