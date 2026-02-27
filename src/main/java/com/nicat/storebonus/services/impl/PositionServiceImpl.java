@@ -2,6 +2,7 @@ package com.nicat.storebonus.services.impl;
 
 import com.nicat.storebonus.dtos.request.PositionRequest;
 import com.nicat.storebonus.dtos.response.ApiResponse;
+import com.nicat.storebonus.dtos.response.PositionResponse;
 import com.nicat.storebonus.dtos.response.ResponseMessage;
 import com.nicat.storebonus.entities.Position;
 import com.nicat.storebonus.exceptions.handler.ResourceAlreadyExistsException;
@@ -15,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 
 @Service
@@ -46,4 +48,12 @@ public class PositionServiceImpl implements PositionService {
                 .timestamp(LocalDateTime.now())
                 .build();
     }
+
+    @Override
+    public List<PositionResponse> findAll() {
+        List<Position> positions = positionRepository.findAll();
+        return positionMapper.toListPositionResponse(positions);
+    }
+
+
 }

@@ -28,4 +28,13 @@ public class PositionController {
                 ApiResponse.success(null, ResponseMessage.SUCCESS_CREATE)
         );
     }
+
+    @GetMapping()
+    public ResponseEntity<ApiResponse<List<PositionResponse>>> getAll() {
+        List<PositionResponse> responseList = positionService.findAll();
+        return ResponseEntity.ok(
+                ApiResponse.success(responseList, ResponseMessage.SUCCESS_FETCH)
+        );
+    }
+
 }
