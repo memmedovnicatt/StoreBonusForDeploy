@@ -9,10 +9,13 @@ public enum ResponseMessage {
     SUCCESS_FETCH(1000, "Data fetched successfully"),
     SUCCESS_CREATE(1001, "Data created successfully"),
 
-    // Error codes (example, between the 4000-4999)
+    // Error codes (example, between the 4004-4999)
     NOT_FOUND(4004, "Resource not found"),
     ALREADY_EXISTS(4009, "Resource already exists"),
-    INTERNAL_ERROR(5000, "An unexpected system error occurred");
+    INTERNAL_ERROR(5000, "An unexpected system error occurred"),
+
+    //Validation error
+    VALIDATION_ERROR(6000,"Validation failed");
 
     private final String message;
     private final int code;
