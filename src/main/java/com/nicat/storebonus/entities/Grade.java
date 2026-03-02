@@ -23,9 +23,4 @@ public class Grade extends BaseEntity {
     String type;
 
     LocalDateTime deletedAt;
-
-    //warehouse_id
-    @ManyToOne
-    @JoinColumn(name = "ware_house_id")
-    WareHouse wareHouse;
 }
