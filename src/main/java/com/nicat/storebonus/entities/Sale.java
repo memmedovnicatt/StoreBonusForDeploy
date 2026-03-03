@@ -37,6 +37,5 @@ public class Sale extends BaseEntity {
 
     Date date;
     BigDecimal price;
-
-    //maybe implemented currency for calculated real time and convert AZN
+    String currency;
 }

@@ -18,12 +18,12 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Entity
-@Table(name = "companies")
-public class Compensation extends BaseEntity {
+@Table(name = "grade_histories")
+public class GradeHistory extends BaseEntity {
 
     //employee_id
     @ManyToOne
-    @JoinColumn(name = "employer_id")
+    @JoinColumn(name = "grade_histories")
     Employer employer;
 
     BigDecimal baseSalary;

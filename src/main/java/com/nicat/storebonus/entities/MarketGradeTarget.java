@@ -8,6 +8,8 @@ import jakarta.persistence.Table;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
+
 @EqualsAndHashCode(callSuper = true)
 @Data
 @Builder
@@ -15,8 +17,8 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Entity
-@Table(name = "employer_sale_targets")
-public class MarketSaleTarget extends BaseEntity {
+@Table(name = "market_grade_targets")
+public class MarketGradeTarget extends BaseEntity {
 
     //market_id
     @ManyToOne
@@ -24,5 +26,6 @@ public class MarketSaleTarget extends BaseEntity {
     Market market;
 
     String period;
-    Double targetAmount;
+    BigDecimal minThresholdAmount;
+    BigDecimal maxThresholdAmount;
 }

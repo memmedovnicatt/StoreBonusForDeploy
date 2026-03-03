@@ -3,13 +3,8 @@ package com.nicat.storebonus.entities;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import org.yaml.snakeyaml.error.Mark;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.Date;
 
 @Data
@@ -20,7 +15,7 @@ import java.util.Date;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Entity
 @Table(name = "employer_contracts")
-public class EmployerSalary extends BaseEntity {
+public class EmployerContract extends BaseEntity {
     Date validFrom;
 
     Date validTo;

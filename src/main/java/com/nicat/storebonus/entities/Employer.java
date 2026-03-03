@@ -21,6 +21,7 @@ public class Employer extends BaseEntity {
     String name;
     String surname;
     String mail;
+    String phoneNumber;
     byte age;
 
     LocalDateTime deletedAt;

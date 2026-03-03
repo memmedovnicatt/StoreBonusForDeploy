@@ -1,6 +1,7 @@
 package com.nicat.storebonus.entities;
 
 
+import com.nicat.storebonus.enums.GradeType;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -20,7 +21,8 @@ import java.time.LocalDateTime;
 @Table(name = "grades")
 public class Grade extends BaseEntity {
 
-    String type;
+    @Enumerated(EnumType.STRING)
+    GradeType gradeType;
 
     LocalDateTime deletedAt;
 }

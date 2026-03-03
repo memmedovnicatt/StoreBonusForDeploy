@@ -16,7 +16,7 @@ import org.yaml.snakeyaml.error.Mark;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Entity
-@Table(name = "companies")
+@Table(name = "grade_position_bonusses")
 public class GradePositionBonus extends BaseEntity {
     //grade_id
     @ManyToOne
