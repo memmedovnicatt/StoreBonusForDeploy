@@ -5,6 +5,7 @@ import com.nicat.storebonus.dtos.response.ApiResponse;
 import com.nicat.storebonus.dtos.response.ResponseMessage;
 import com.nicat.storebonus.entities.Company;
 import com.nicat.storebonus.entities.WareHouse;
+import com.nicat.storebonus.exceptions.handler.ResourceNotFoundException;
 import com.nicat.storebonus.repositories.WareHouseRepository;
 import com.nicat.storebonus.services.CompanyService;
 import com.nicat.storebonus.services.WareHouseService;
@@ -43,5 +44,15 @@ public class WareHouseServiceImpl implements WareHouseService {
                 .success(true)
                 .timestamp(LocalDateTime.now())
                 .build();
+    }
+
+    @Override
+    public WareHouse checkExistsWareHouse(Long wareHouseId) {
+        WareHouse wareHouse = wareHouseRepository.findById(wareHouseId)
+                .orElse(null);
+        if (wareHouse == null) {
+            throw new ResourceNotFoundException("WareHouse", "id", wareHouseId);
+        }
+        return wareHouse;
     }
 }
