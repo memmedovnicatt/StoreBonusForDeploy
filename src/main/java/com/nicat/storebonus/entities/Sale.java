@@ -9,6 +9,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Date;
 
@@ -31,7 +32,7 @@ public class Sale extends BaseEntity {
     @JoinColumn(name = "market_id")
     Market market;
 
-    Date date;
+    LocalDate date;
     BigDecimal price;
     String currency;
 }

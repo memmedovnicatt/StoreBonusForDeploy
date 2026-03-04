@@ -25,6 +25,11 @@ public class MarketGradeTarget extends BaseEntity {
     @JoinColumn(name = "market_id")
     Market market;
 
+    //grade_id
+    @ManyToOne
+    @JoinColumn(name = "grade_id")
+    Grade grade;
+
     String period;
     BigDecimal minThresholdAmount;
     BigDecimal maxThresholdAmount;
