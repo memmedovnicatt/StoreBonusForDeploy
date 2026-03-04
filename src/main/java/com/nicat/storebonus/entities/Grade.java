@@ -21,6 +21,8 @@ import java.time.LocalDateTime;
 @Table(name = "grades")
 public class Grade extends BaseEntity {
 
+    String name;
+
     @Enumerated(EnumType.STRING)
     GradeType gradeType;
 

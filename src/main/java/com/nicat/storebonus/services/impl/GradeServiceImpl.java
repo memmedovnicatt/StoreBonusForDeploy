@@ -24,8 +24,12 @@ public class GradeServiceImpl implements GradeService {
     public void create(GradeRequest gradeRequest) {
         Grade grade = Grade.builder()
                 .gradeType(gradeRequest.gradeType())
+                .name(gradeRequest.name())
                 .build();
         gradeRepository.save(grade);
+
+        Grade grade1 = new Grade();
+        grade1.set;
     }
 
     @Override
