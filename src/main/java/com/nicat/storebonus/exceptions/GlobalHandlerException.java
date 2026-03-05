@@ -4,6 +4,7 @@ import com.nicat.storebonus.dtos.response.ApiResponse;
 import com.nicat.storebonus.dtos.response.ResponseMessage;
 import com.nicat.storebonus.exceptions.handler.ResourceAlreadyExistsException;
 import com.nicat.storebonus.exceptions.handler.ResourceNotFoundException;
+import com.nicat.storebonus.exceptions.handler.TargetNotReachedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -77,6 +78,20 @@ public class GlobalHandlerException {
                 .timestamp(LocalDateTime.now())
                 .build();
 
+        return ResponseEntity
+                .status(HttpStatus.ALREADY_REPORTED)
+                .body(response);
+    }
+
+    //for manage all not found exceptions
+    @ExceptionHandler(TargetNotReachedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTargetNotReached(TargetNotReachedException ex) {
+        ApiResponse<Void> response = ApiResponse.<Void>builder()
+                .success(false)
+                .message(ex.getMessage())
+                .code(ResponseMessage.TARGET_NOT_REACHED.getCode())
+                .timestamp(LocalDateTime.now())
+                .build();
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(response);
