@@ -1,13 +1,11 @@
 package com.nicat.storebonus.entities;
 
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
@@ -22,14 +20,16 @@ public class MarketGradeHistory extends BaseEntity {
 
     LocalDate startDate;
     LocalDate endDate;
+    BigDecimal minThreshold;
+    BigDecimal maxThreshold;
 
     //grade_id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "grade_id")
     Grade grade;
 
     //market_id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "market_id")
     Market market;
 
