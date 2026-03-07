@@ -22,6 +22,7 @@ public class MarketGradeHistory extends BaseEntity {
     LocalDate endDate;
     BigDecimal minThreshold;
     BigDecimal maxThreshold;
+    BigDecimal generalPercent;
 
     //grade_id
     @ManyToOne(fetch = FetchType.LAZY)

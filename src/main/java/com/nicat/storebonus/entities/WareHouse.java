@@ -24,7 +24,7 @@ public class WareHouse extends BaseEntity {
     String location;
     LocalDateTime deletedAt;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id")
     Company company;
 }

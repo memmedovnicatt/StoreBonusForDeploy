@@ -28,7 +28,7 @@ public class Market extends BaseEntity {
     LocalDateTime deletedAt;
 
     //warehouse_id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ware_house_id")
     WareHouse wareHouse;
 }

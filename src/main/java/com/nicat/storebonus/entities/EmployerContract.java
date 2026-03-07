@@ -25,17 +25,17 @@ public class EmployerContract extends BaseEntity {
     String currency;
 
     //employer_id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employer_id")
     Employer employer;
 
     //market_id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "market_id")
     Market market;
 
     //position_id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "position_id")
     Position position;
 }
