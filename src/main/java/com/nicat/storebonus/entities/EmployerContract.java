@@ -30,11 +30,13 @@ public class EmployerContract extends BaseEntity {
     Employer employer;
 
     //market_id
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "market_id")
     Market market;
 
     //position_id
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "position_id")
     Position position;

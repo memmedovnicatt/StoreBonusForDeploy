@@ -40,7 +40,10 @@ public class MarketServiceImpl implements MarketService {
     public void create(MarketRequest marketRequest) {
         WareHouse wareHouse = wareHouseService.checkExistsWareHouse(marketRequest.wareHouseId());
 
-        Grade grade = gradeService.checkExistsGrade(marketRequest.gradeId());
+        Grade grade = null;
+        if (marketRequest.gradeId() != null) {
+            grade = gradeService.checkExistsGrade(marketRequest.gradeId());
+        }
 
         Market market = Market.builder()
                 .wareHouse(wareHouse)
@@ -57,6 +60,7 @@ public class MarketServiceImpl implements MarketService {
                 .maxThreshold(marketRequest.maxThreshold())
                 .build();
         marketGradeHistoryRepository.save(marketGradeHistory);
+
     }
 
     @Override
