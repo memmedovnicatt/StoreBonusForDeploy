@@ -26,17 +26,11 @@ public class EmployerContractServiceImpl implements EmployerContractService {
     EmployerContractRepository employerContractRepository;
     EmployerService employerService;
     MarketService marketService;
-    PositionService positionService;
     EmployerContractMapper employerContractMapper;
 
     @Override
     public void create(EmployerContractRequest employerContractRequest) {
         log.info("create method basladi ");
-
-        Position position = positionService
-                .checkExistsPosition(employerContractRequest.positionId());
-
-        log.info("position tapildi");
 
         Market market = marketService
                 .checkExistsMarket(employerContractRequest.marketId());
@@ -48,7 +42,7 @@ public class EmployerContractServiceImpl implements EmployerContractService {
                 .toEmployerContract(employerContractRequest);
 
         savedEmployerContract.setEmployer(employer);
-        savedEmployerContract.setPosition(position);
+        savedEmployerContract.setPosition(employer.getPosition());
         savedEmployerContract.setMarket(market);
 
         employerContractRepository.save(savedEmployerContract);

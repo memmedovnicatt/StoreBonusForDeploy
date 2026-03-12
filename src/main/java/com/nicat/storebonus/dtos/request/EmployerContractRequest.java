@@ -23,9 +23,6 @@ public record EmployerContractRequest(
         Long employerId,
 
         @NotNull
-        Long marketId,
-
-        @NotNull
-        Long positionId
+        Long marketId
 ) {
 }

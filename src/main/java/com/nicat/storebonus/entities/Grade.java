@@ -2,16 +2,15 @@ package com.nicat.storebonus.entities;
 
 
 import com.nicat.storebonus.enums.GradeType;
-import jakarta.persistence.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -31,4 +30,7 @@ public class Grade extends BaseEntity {
     BigDecimal generalPercent;
 
     LocalDateTime deletedAt;
+    BigDecimal minPercent;
+    BigDecimal middlePercent;
+    BigDecimal maxPercent;
 }

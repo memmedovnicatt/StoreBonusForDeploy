@@ -19,6 +19,8 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -45,6 +47,10 @@ public class MarketServiceImpl implements MarketService {
             grade = gradeService.checkExistsGrade(marketRequest.gradeId());
         }
 
+        BigDecimal middleThreshold = calculateMiddleThreshold(marketRequest.minThreshold(),
+                marketRequest.maxThreshold());
+
+        log.info("middleThreshold : {}", middleThreshold);
         Market market = Market.builder()
                 .wareHouse(wareHouse)
                 .name(marketRequest.name())
@@ -68,5 +74,8 @@ public class MarketServiceImpl implements MarketService {
         return marketRepository.findById(marketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Market", "id", marketId));
     }
-}
 
+    public BigDecimal calculateMiddleThreshold(BigDecimal a, BigDecimal b) {
+        return a.add(b).divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+    }
+}

@@ -10,6 +10,7 @@ import com.nicat.storebonus.exceptions.handler.ResourceNotFoundException;
 import com.nicat.storebonus.exceptions.handler.TargetNotReachedException;
 import com.nicat.storebonus.repositories.*;
 import com.nicat.storebonus.services.GradeService;
+import com.nicat.storebonus.utility.ThresholdsUtil;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -39,6 +40,7 @@ public class GradeServiceImpl implements GradeService {
     EmployerContractRepository employerContractRepository;
     EmployerRepository employerRepository;
     GradeHistoryRepository gradeHistoryRepository;
+    ThresholdsUtil thresholdsUtil;
 
     @Override
     public void create(GradeRequest gradeRequest) {
@@ -46,6 +48,8 @@ public class GradeServiceImpl implements GradeService {
                 .gradeType(gradeRequest.gradeType())
                 .name(gradeRequest.name())
                 .generalPercent(gradeRequest.generalPercent())
+                .minPercent(gradeRequest.minPercent())
+                .maxPercent(gradeRequest.maxPercent())
                 .build();
         gradeRepository.save(grade);
     }
@@ -72,6 +76,8 @@ public class GradeServiceImpl implements GradeService {
             //show that external method,because all types of grade utilized it
             BigDecimal totalSale = calculateSalesOfMarket(marketGradeHistory.getMarket().getId(),
                     marketGradeHistory.getStartDate());
+
+            //todo compare total sale with 0,if equal to zero throw exception
 
             Long gradeId = marketGradeHistory.getGrade().getId();
 
@@ -138,22 +144,8 @@ public class GradeServiceImpl implements GradeService {
                     }
                 }
 
-                log.info("employerContract response : {}", employerContractResponse);
-
-                for (EmployerContractResponse response : employerContractResponse) {
-                    Employer employer = employerMap.get(response.getEmployerId());
-
-                    GradeHistory gradeHistory = new GradeHistory();
-                    gradeHistory.setEmployer(employer);
-                    gradeHistory.setBaseSalary(response.getBaseSalary());
-                    gradeHistory.setBonusAmount(response.getBonusAmount());
-                    gradeHistory.setTotalSalary(response.getTotalAmount());
-                    gradeHistory.setPaidAt(LocalDateTime.now());
-                    gradeHistory.setPeriod("MONTHLY");
-
-                    gradeHistories.add(gradeHistory);
-                }
-                gradeHistoryRepository.saveAll(gradeHistories);
+                //extract method,because all method used this.
+                saveGradeHistories(employerContractResponse, employerMap);
             }
 
             if (marketGradeHistory.getGrade().getGradeType() == GradeType.Percent) {
@@ -208,8 +200,6 @@ public class GradeServiceImpl implements GradeService {
                             RoundingMode.HALF_UP
                     );
                 }
-//                log.info("amountPerEmployer : {}", amountPerEmployer);
-
                 for (GradeRuleResponse gradeRuleResponse : updatedRules) {
                     EmployerContract contract = contractMap.get(gradeRuleResponse.getEmployeeId());
                     if (contract != null) {
@@ -236,9 +226,6 @@ public class GradeServiceImpl implements GradeService {
                 List<EmployerContractResponse> employerContracts = employerContractRepository
                         .findByEmployerIdNotIn(employeeIds, marketId, true);
 
-                log.info("employerContracts (grade ruleda olmayan istifadeciler gelmelidir) : {}", employerContracts);
-
-
                 List<EmployerContractResponse> notSpecificEmployer = new ArrayList<>();
 
                 for (EmployerContractResponse employerContractResponse1 : employerContracts) {
@@ -250,11 +237,7 @@ public class GradeServiceImpl implements GradeService {
                     response.setEmployerId(employerContractResponse1.getEmployerId());
                     response.setBaseSalary(employerContractResponse1.getBaseSalary());
 
-                    log.info("amountPerEmployer before set: {}", amountPerEmployer);
-
                     response.setBonusAmount(amountPerEmployer);
-
-                    log.info("bonusAmount after set: {}", response.getBonusAmount());
 
                     response.setCurrency(employerContractResponse1.getCurrency());
                     response.setValidFrom(employerContractResponse1.getValidFrom());
@@ -264,31 +247,96 @@ public class GradeServiceImpl implements GradeService {
 
                     notSpecificEmployer.add(response);
                 }
-                log.info("SON HAL -> employerContracts (grade ruleda olmayan istifadeciler gelmelidir) : {}",
-                        notSpecificEmployer);
-
-                log.info("employerContractResponse (adi isci olmayanlar hansiki grade ruleda qeyd edilenler) : {}",
-                        employerContractResponse);
 
                 employerContractResponse.addAll(notSpecificEmployer);
 
-                log.info("butun list : {}", employerContractResponse);
-
-                for (EmployerContractResponse response : employerContractResponse) {
-                    Employer employer = employerMap.get(response.getEmployerId());
-
-                    GradeHistory gradeHistory = new GradeHistory();
-                    gradeHistory.setEmployer(employer);
-                    gradeHistory.setBaseSalary(response.getBaseSalary());
-                    gradeHistory.setBonusAmount(response.getBonusAmount());
-                    gradeHistory.setTotalSalary(response.getTotalAmount());
-                    gradeHistory.setPaidAt(LocalDateTime.now());
-                    gradeHistory.setPeriod("MONTHLY");
-
-                    gradeHistories.add(gradeHistory);
-                }
-                gradeHistoryRepository.saveAll(gradeHistories);
+                //extract method,because all method used this.
+                saveGradeHistories(employerContractResponse, employerMap);
             }
+            if (marketGradeHistory.getGrade().getGradeType() == GradeType.Threshold) {
+                log.info("threshold olan if bloku basladi");
+                List<EmployerContractResponse> employerContractResponses = new ArrayList<>();
+
+                log.info("1ci EmployerContractResponse : {}", employerContractResponses);
+
+
+                log.info("totalSale : {}", totalSale);
+
+                int totalCountOfEmployer = employerContractRepository
+                        .countByMarketIdAndIsActive(marketId, true);
+
+                log.info("totalCountOfEmployer : {}", totalCountOfEmployer);
+
+                BigDecimal middleThreshold = thresholdsUtil.calculateMiddleThreshold(marketGradeHistory.getMinThreshold(),
+                        marketGradeHistory.getMaxThreshold());
+                log.info("middleThreshold : {}", middleThreshold);
+
+                // todo:extract method
+                BigDecimal percent = BigDecimal.ZERO;
+                if (totalSale.compareTo(marketGradeHistory.getMinThreshold()) >= 0 && totalSale.compareTo(middleThreshold) <= 0) {
+                    percent = marketGradeHistory.getGrade().getMinPercent();
+                } else if (totalSale.compareTo(middleThreshold) > 0 && totalSale.compareTo(marketGradeHistory.getMaxThreshold()) <= 0) {
+                    percent = middleThreshold;
+                } else if (totalSale.compareTo(marketGradeHistory.getMaxThreshold()) > 0) {
+                    percent = marketGradeHistory.getGrade().getMaxPercent();
+                }
+                log.info("percent : {}", percent);
+
+                BigDecimal fixAmount = totalSale.multiply(
+                        percent.divide(BigDecimal.valueOf(100),
+                                4, RoundingMode.HALF_UP));
+
+                log.info("fixAmount : {}", fixAmount);
+
+
+                BigDecimal bonusAmountPerEmployer = fixAmount.divide(
+                        BigDecimal.valueOf(totalCountOfEmployer),
+                        2,
+                        RoundingMode.HALF_UP
+                );
+
+                log.info("amountPerEmployer : {}", bonusAmountPerEmployer);
+
+
+                List<EmployerContractResponse> employerContracts = employerContractRepository
+                        .findAllByMarketIdAndIsActive(marketId, true);
+
+                log.info(" before employerContracts : {}", employerContracts);
+
+                for (EmployerContractResponse updateContractResponse : employerContracts) {
+                    BigDecimal baseSalary = Optional.ofNullable(updateContractResponse.getBaseSalary()).orElse(BigDecimal.ZERO);
+
+                    updateContractResponse.setBonusAmount(bonusAmountPerEmployer);
+
+                    updateContractResponse.setTotalAmount(baseSalary.add(bonusAmountPerEmployer));
+
+                    employerContractResponses.add(updateContractResponse);
+                }
+
+
+                List<Long> list = employerContractResponses.stream()
+                        .map(EmployerContractResponse::getEmployerId)
+                        .distinct()
+                        .toList();
+
+                log.info("after employer contracts response : {}", employerContractResponses);
+
+                log.info("list : {}", list);
+
+
+                Map<Long, Employer> employerMap1 = employerRepository.findAllById(list)
+                        .stream()
+                        .collect(Collectors.toMap(Employer::getId, e -> e));
+
+                log.info("employerMap 1 :{}", employerMap1);
+
+
+                saveGradeHistories(employerContractResponses, employerMap1);
+
+                //methodlara bol kodu seliqeye sal.artiq melumatlari sil.duzgun log yaz.
+
+            }
+
         }
         watch.stop();
         log.info("Calculate Grade method execution time: {} ms", watch.getTotalTimeMillis());
@@ -298,5 +346,29 @@ public class GradeServiceImpl implements GradeService {
     public BigDecimal calculateSalesOfMarket(Long marketId, LocalDate startDate) {
         return saleRepository.sumPriceByMarketIdAndDate(marketId,
                 startDate);
+    }
+
+    public void saveGradeHistories(List<EmployerContractResponse> responses, Map<Long, Employer> employerMap) {
+        List<GradeHistory> histories = responses.stream().map(res -> {
+            GradeHistory history = new GradeHistory();
+            history.setEmployer(employerMap.get(res.getEmployerId()));
+            history.setBaseSalary(res.getBaseSalary());
+            history.setBonusAmount(res.getBonusAmount());
+            history.setTotalSalary(res.getTotalAmount());
+            history.setPaidAt(LocalDateTime.now());
+            history.setPeriod("MONTHLY");
+
+            log.info("histories after : {}",history);
+
+
+            return history;
+
+
+        }).toList();
+
+
+        gradeHistoryRepository.saveAll(histories);
+
+//        log.info("history : {}", histories);
     }
 }

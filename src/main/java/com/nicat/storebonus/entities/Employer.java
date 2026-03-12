@@ -26,6 +26,7 @@ public class Employer extends BaseEntity {
 
     LocalDateTime deletedAt;
 
+    @ToString.Exclude
     @ManyToOne
     @JoinColumn(name = "position_id")
     Position position;

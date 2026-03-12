@@ -10,6 +10,8 @@ public record GradeRequest(
         GradeType gradeType,
 
         String name,
-        BigDecimal generalPercent
+        BigDecimal generalPercent,
+        BigDecimal minPercent,
+        BigDecimal maxPercent
 ) {
 }

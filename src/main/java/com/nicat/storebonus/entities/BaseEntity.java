@@ -9,6 +9,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @MappedSuperclass
@@ -33,6 +34,17 @@ public abstract class BaseEntity {
     protected void onCreate() {
         if (!isActive) {
             isActive = true;
+        }
+        if (this instanceof Grade g) {
+            if (g.getMinPercent() == null) {
+                g.setMinPercent(BigDecimal.ZERO);
+            }
+            if (g.getMiddlePercent() == null) {
+                g.setMiddlePercent(BigDecimal.ZERO);
+            }
+            if (g.getMaxPercent() == null) {
+                g.setMaxPercent(BigDecimal.ZERO);
+            }
         }
     }
 }
