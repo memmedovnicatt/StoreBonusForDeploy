@@ -8,8 +8,9 @@ import java.time.LocalDate;
 
 @Data
 @AllArgsConstructor
-@NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@Builder
+@NoArgsConstructor
 public class EmployerContractResponse {
     Long gradeId;
     Long positionId;

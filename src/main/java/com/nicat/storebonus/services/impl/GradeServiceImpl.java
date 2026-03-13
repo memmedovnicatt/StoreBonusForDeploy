@@ -10,7 +10,6 @@ import com.nicat.storebonus.exceptions.handler.ResourceNotFoundException;
 import com.nicat.storebonus.exceptions.handler.TargetNotReachedException;
 import com.nicat.storebonus.repositories.*;
 import com.nicat.storebonus.services.GradeService;
-import com.nicat.storebonus.utility.ThresholdsUtil;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -40,7 +39,6 @@ public class GradeServiceImpl implements GradeService {
     EmployerContractRepository employerContractRepository;
     EmployerRepository employerRepository;
     GradeHistoryRepository gradeHistoryRepository;
-    ThresholdsUtil thresholdsUtil;
 
     @Override
     public void create(GradeRequest gradeRequest) {
@@ -64,10 +62,10 @@ public class GradeServiceImpl implements GradeService {
     public void calculateGrade(GradeCalculationRequest gradeCalculationRequest) {
         StopWatch watch = new StopWatch();
         watch.start();
+        log.info("calculateGrade method was started with marketId: {}", gradeCalculationRequest.marketId());
 
-        //check active grade of market
-        Optional<MarketGradeHistory> optional = marketGradeHistoryRepository
-                .findByMarketIdAndIsActive(gradeCalculationRequest.marketId(), true);
+        Optional<MarketGradeHistory> optional =
+                checkActiveGradeOfMarket(gradeCalculationRequest.marketId(), true);
 
         //check for if active grade of market is not present,code not throws exception
         if (optional.isPresent()) {
@@ -77,278 +75,225 @@ public class GradeServiceImpl implements GradeService {
             BigDecimal totalSale = calculateSalesOfMarket(marketGradeHistory.getMarket().getId(),
                     marketGradeHistory.getStartDate());
 
-            //todo compare total sale with 0,if equal to zero throw exception
-
-            Long gradeId = marketGradeHistory.getGrade().getId();
-
-            Long marketId = marketGradeHistory.getMarket().getId();
-
-            //select bonus amount of active positions
-            List<GradeRuleResponse> gradeRules = gradeRuleRepository
-                    .findByGradeIdAndMarketId(gradeId,
-                            marketId);
-
-            List<Long> employeeIds = gradeRules.stream()
-                    .map(GradeRuleResponse::getEmployeeId)
-                    .distinct()
-                    .toList();
-
-            List<EmployerContract> contracts = employerContractRepository
-                    .findAllByEmployerIdInAndIsActive(employeeIds, true);
-
-            Map<Long, EmployerContract> contractMap = contracts.stream()
-                    .collect(Collectors.toMap(c -> c.getEmployer().getId(), Function.identity()));
-
-            //create list for set all employers bonus amount with base salary
-            List<EmployerContractResponse> employerContractResponse = new ArrayList<>();
-
-            List<Long> employerIds = employerContractResponse.stream()
-                    .map(EmployerContractResponse::getEmployerId)
-                    .distinct()
-                    .toList();
-
-            Map<Long, Employer> employerMap = employerRepository.findAllById(employerIds)
-                    .stream()
-                    .collect(Collectors.toMap(Employer::getId, e -> e));
-
-            List<GradeHistory> gradeHistories = new ArrayList<>();
-
-            if (marketGradeHistory.getGrade().getGradeType() == GradeType.Fixed) {
-
-                if (totalSale.compareTo(marketGradeHistory.getMinThreshold()) <= 0) {
-                    throw new TargetNotReachedException("Market", "min threshold",
-                            marketGradeHistory.getMinThreshold());
-                }
-
-                for (GradeRuleResponse gradeRuleResponse : gradeRules) {
-                    EmployerContract contract = contractMap.get(gradeRuleResponse.getEmployeeId());
-
-                    if (contract != null) {
-                        EmployerContractResponse response = new EmployerContractResponse();
-
-                        response.setGradeId(gradeRuleResponse.getGradeId());
-                        response.setPositionId(contract.getPosition().getId());
-                        response.setMarketId(contract.getMarket().getId());
-                        response.setEmployerId(contract.getEmployer().getId());
-                        response.setBaseSalary(contract.getBaseSalary());
-                        response.setBonusAmount(gradeRuleResponse.getBonusAmount());
-                        response.setCurrency(contract.getCurrency());
-                        response.setValidFrom(contract.getValidFrom());
-                        response.setValidTo(contract.getValidTo());
-
-                        BigDecimal baseSalary = Optional.ofNullable(contract.getBaseSalary()).orElse(BigDecimal.ZERO);
-                        BigDecimal bonusAmount = Optional.ofNullable(gradeRuleResponse.getBonusAmount()).orElse(BigDecimal.ZERO);
-                        response.setTotalAmount(baseSalary.add(bonusAmount));
-
-                        employerContractResponse.add(response);
-                    }
-                }
-
-                //extract method,because all method used this.
-                saveGradeHistories(employerContractResponse, employerMap);
+            //check total sales of market,if conditions are true,the code will not be executed
+            //todo:extract general method
+            if (totalSale.compareTo(marketGradeHistory.getMinThreshold()) <= 0) {
+                throw new TargetNotReachedException("Market", "min threshold",
+                        marketGradeHistory.getMinThreshold());
             }
 
-            if (marketGradeHistory.getGrade().getGradeType() == GradeType.Percent) {
-                if (totalSale.compareTo(marketGradeHistory.getMinThreshold()) <= 0) {
-                    throw new TargetNotReachedException("Market", "threshold", marketGradeHistory.getMinThreshold());
-                }
-                int countOfSpecialEmployer = gradeRules.size();
-
-                int totalCountOfEmployer = employerContractRepository.countByMarketIdAndIsActive(marketId, true);
-
-                int countOfNotSpecialEmployer = totalCountOfEmployer - countOfSpecialEmployer;
-
-                BigDecimal fixAmount = totalSale.multiply(
-                        marketGradeHistory.getGrade().getGeneralPercent().divide(BigDecimal.valueOf(100),
-                                4, RoundingMode.HALF_UP));
-
-                BigDecimal sumOfPercent = BigDecimal.ZERO;
-
-                List<GradeRuleResponse> updatedRules = new ArrayList<>();
-
-                for (GradeRuleResponse rule : gradeRules) {
-                    BigDecimal bonusPercent = rule.getBonusPercent();
-                    sumOfPercent = sumOfPercent.add(bonusPercent);
-                    Long employeeId = rule.getEmployeeId();
-                    // formula: (fixAmount * bonusPercent) / 100
-                    BigDecimal newPriceOfGradeRule = fixAmount.multiply(bonusPercent)
-                            .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-
-                    updatedRules.add(new GradeRuleResponse(
-                            rule.getGradeId(),
-                            rule.getPositionId(),
-                            employeeId,
-                            rule.getMarketId(),
-                            rule.getBonusPercent(),
-                            newPriceOfGradeRule,
-                            rule.getCurrency()
-                    ));
-                }
-
-                BigDecimal newPercent = BigDecimal.valueOf(100).subtract(sumOfPercent);
-
-                BigDecimal newPriceOfNotSpecialEmployer = fixAmount.multiply(
-                        newPercent.divide(BigDecimal.valueOf(100),
-                                4, RoundingMode.HALF_UP));
-
-                BigDecimal amountPerEmployer = BigDecimal.ZERO;
-
-                if (countOfNotSpecialEmployer > 0) {
-                    amountPerEmployer = newPriceOfNotSpecialEmployer.divide(
-                            BigDecimal.valueOf(countOfNotSpecialEmployer),
-                            2,
-                            RoundingMode.HALF_UP
-                    );
-                }
-                for (GradeRuleResponse gradeRuleResponse : updatedRules) {
-                    EmployerContract contract = contractMap.get(gradeRuleResponse.getEmployeeId());
-                    if (contract != null) {
-                        EmployerContractResponse response = new EmployerContractResponse();
-
-                        response.setGradeId(gradeRuleResponse.getGradeId());
-                        response.setPositionId(contract.getPosition().getId());
-                        response.setMarketId(contract.getMarket().getId());
-                        response.setEmployerId(contract.getEmployer().getId());
-                        response.setBaseSalary(contract.getBaseSalary());
-                        response.setBonusAmount(gradeRuleResponse.getBonusAmount());
-                        response.setCurrency(contract.getCurrency());
-                        response.setValidFrom(contract.getValidFrom());
-                        response.setValidTo(contract.getValidTo());
-
-                        BigDecimal baseSalary = Optional.ofNullable(contract.getBaseSalary()).orElse(BigDecimal.ZERO);
-                        BigDecimal bonusAmount = Optional.ofNullable(gradeRuleResponse.getBonusAmount()).orElse(BigDecimal.ZERO);
-                        response.setTotalAmount(baseSalary.add(bonusAmount));
-
-                        employerContractResponse.add(response);
-                    }
-                }
-
-                List<EmployerContractResponse> employerContracts = employerContractRepository
-                        .findByEmployerIdNotIn(employeeIds, marketId, true);
-
-                List<EmployerContractResponse> notSpecificEmployer = new ArrayList<>();
-
-                for (EmployerContractResponse employerContractResponse1 : employerContracts) {
-                    EmployerContractResponse response = new EmployerContractResponse();
-
-                    response.setGradeId(employerContractResponse1.getGradeId());
-                    response.setPositionId(employerContractResponse1.getPositionId());
-                    response.setMarketId(employerContractResponse1.getMarketId());
-                    response.setEmployerId(employerContractResponse1.getEmployerId());
-                    response.setBaseSalary(employerContractResponse1.getBaseSalary());
-
-                    response.setBonusAmount(amountPerEmployer);
-
-                    response.setCurrency(employerContractResponse1.getCurrency());
-                    response.setValidFrom(employerContractResponse1.getValidFrom());
-                    response.setValidTo(employerContractResponse1.getValidTo());
-
-                    response.setTotalAmount(amountPerEmployer.add(employerContractResponse1.getBaseSalary()));
-
-                    notSpecificEmployer.add(response);
-                }
-
-                employerContractResponse.addAll(notSpecificEmployer);
-
-                //extract method,because all method used this.
-                saveGradeHistories(employerContractResponse, employerMap);
-            }
-            if (marketGradeHistory.getGrade().getGradeType() == GradeType.Threshold) {
-                log.info("threshold olan if bloku basladi");
-                List<EmployerContractResponse> employerContractResponses = new ArrayList<>();
-
-                log.info("1ci EmployerContractResponse : {}", employerContractResponses);
-
-
-                log.info("totalSale : {}", totalSale);
-
-                int totalCountOfEmployer = employerContractRepository
-                        .countByMarketIdAndIsActive(marketId, true);
-
-                log.info("totalCountOfEmployer : {}", totalCountOfEmployer);
-
-                BigDecimal middleThreshold = thresholdsUtil.calculateMiddleThreshold(marketGradeHistory.getMinThreshold(),
-                        marketGradeHistory.getMaxThreshold());
-                log.info("middleThreshold : {}", middleThreshold);
-
-                // todo:extract method
-                BigDecimal percent = BigDecimal.ZERO;
-                if (totalSale.compareTo(marketGradeHistory.getMinThreshold()) >= 0 && totalSale.compareTo(middleThreshold) <= 0) {
-                    percent = marketGradeHistory.getGrade().getMinPercent();
-                } else if (totalSale.compareTo(middleThreshold) > 0 && totalSale.compareTo(marketGradeHistory.getMaxThreshold()) <= 0) {
-                    percent = middleThreshold;
-                } else if (totalSale.compareTo(marketGradeHistory.getMaxThreshold()) > 0) {
-                    percent = marketGradeHistory.getGrade().getMaxPercent();
-                }
-                log.info("percent : {}", percent);
-
-                BigDecimal fixAmount = totalSale.multiply(
-                        percent.divide(BigDecimal.valueOf(100),
-                                4, RoundingMode.HALF_UP));
-
-                log.info("fixAmount : {}", fixAmount);
-
-
-                BigDecimal bonusAmountPerEmployer = fixAmount.divide(
-                        BigDecimal.valueOf(totalCountOfEmployer),
-                        2,
-                        RoundingMode.HALF_UP
-                );
-
-                log.info("amountPerEmployer : {}", bonusAmountPerEmployer);
-
-
-                List<EmployerContractResponse> employerContracts = employerContractRepository
-                        .findAllByMarketIdAndIsActive(marketId, true);
-
-                log.info(" before employerContracts : {}", employerContracts);
-
-                for (EmployerContractResponse updateContractResponse : employerContracts) {
-                    BigDecimal baseSalary = Optional.ofNullable(updateContractResponse.getBaseSalary()).orElse(BigDecimal.ZERO);
-
-                    updateContractResponse.setBonusAmount(bonusAmountPerEmployer);
-
-                    updateContractResponse.setTotalAmount(baseSalary.add(bonusAmountPerEmployer));
-
-                    employerContractResponses.add(updateContractResponse);
-                }
-
-
-                List<Long> list = employerContractResponses.stream()
-                        .map(EmployerContractResponse::getEmployerId)
-                        .distinct()
-                        .toList();
-
-                log.info("after employer contracts response : {}", employerContractResponses);
-
-                log.info("list : {}", list);
-
-
-                Map<Long, Employer> employerMap1 = employerRepository.findAllById(list)
-                        .stream()
-                        .collect(Collectors.toMap(Employer::getId, e -> e));
-
-                log.info("employerMap 1 :{}", employerMap1);
-
-
-                saveGradeHistories(employerContractResponses, employerMap1);
-
-                //methodlara bol kodu seliqeye sal.artiq melumatlari sil.duzgun log yaz.
-
+            //todo:extract general method
+            GradeType gradeType = marketGradeHistory.getGrade().getGradeType();
+            switch (gradeType) {
+                case Fixed -> handleFixedGrade(marketGradeHistory);
+                case Threshold -> handleThresholdGrade(marketGradeHistory, totalSale);
+                case Percent -> handlePercentGrade(marketGradeHistory, totalSale);
             }
 
+        } else {
+            throw new ResourceNotFoundException("Grade of market", "id", gradeCalculationRequest.marketId());
         }
         watch.stop();
         log.info("Calculate Grade method execution time: {} ms", watch.getTotalTimeMillis());
     }
 
+    private void handlePercentGrade(MarketGradeHistory marketGradeHistory, BigDecimal totalSale) {
+        //select bonus amount of active positions
+        //todo:maybe extract general method - > getRules()
+        List<GradeRuleResponse> rules = gradeRuleRepository
+                .findByGradeIdAndMarketId(marketGradeHistory.getGrade().getId(),
+                        marketGradeHistory.getMarket().getId());
 
-    public BigDecimal calculateSalesOfMarket(Long marketId, LocalDate startDate) {
+        List<Long> employeeIds = collectEmployeeIds(rules);
+
+        Long marketId = marketGradeHistory.getMarket().getId();
+
+        int totalStaff = employerContractRepository
+                .countByMarketIdAndIsActive(marketGradeHistory.getMarket().getId(), true);
+
+        BigDecimal fixAmount = totalSale.multiply(
+                marketGradeHistory.getGrade().getGeneralPercent().divide(BigDecimal.valueOf(100),
+                        4, RoundingMode.HALF_UP));
+
+        List<EmployerContractResponse> specialResponses = calculateSpecialPercentBonus(rules, fixAmount, getContractMap(employeeIds));
+
+        BigDecimal distributedPercent = rules.stream()
+                .map(GradeRuleResponse::getBonusPercent)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<EmployerContractResponse> nonSpecialResponses = calculateNonSpecialPercentBonus(marketGradeHistory, fixAmount, distributedPercent, employeeIds, totalStaff);
+
+        List<EmployerContractResponse> allResponses = new ArrayList<>(specialResponses);
+        allResponses.addAll(nonSpecialResponses);
+
+        saveGradeHistories(allResponses, getEmployerMap(allResponses.stream().map(EmployerContractResponse::getEmployerId).toList()));
+    }
+
+    private Map<Long, Employer> getEmployerMap(List<Long> ids) {
+        return employerRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(Employer::getId, e -> e));
+    }
+
+
+    private Map<Long, EmployerContract> getContractMap(List<Long> ids) {
+        return employerContractRepository.findAllByEmployerIdInAndIsActive(ids, true).stream()
+                .collect(Collectors.toMap(c -> c.getEmployer().getId(), Function.identity()));
+    }
+
+
+    private List<EmployerContractResponse> calculateSpecialPercentBonus(List<GradeRuleResponse> rules, BigDecimal pool, Map<Long, EmployerContract> contractMap) {
+        return rules.stream().map(rule -> {
+            BigDecimal individualBonus = pool.multiply(rule.getBonusPercent()).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+            return mapToResponse(contractMap.get(rule.getEmployeeId()), individualBonus, rule.getGradeId());
+        }).toList();
+    }
+
+    private List<EmployerContractResponse> calculateNonSpecialPercentBonus(MarketGradeHistory history, BigDecimal pool, BigDecimal usedPercent, List<Long> excludedIds, int totalStaff) {
+        int remainingCount = totalStaff - excludedIds.size();
+        if (remainingCount <= 0) return Collections.emptyList();
+
+        BigDecimal remainingPercent = BigDecimal.valueOf(100).subtract(usedPercent);
+        BigDecimal remainingPool = pool.multiply(remainingPercent.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
+        BigDecimal amountPerPerson = remainingPool.divide(BigDecimal.valueOf(remainingCount), 2, RoundingMode.HALF_UP);
+
+        return employerContractRepository.findByEmployerIdNotIn(excludedIds, history.getMarket().getId(), true)
+                .stream()
+                .peek(res -> {
+                    res.setBonusAmount(amountPerPerson);
+                    res.setTotalAmount(res.getBaseSalary().add(amountPerPerson));
+                }).toList();
+    }
+
+
+    private void handleFixedGrade(MarketGradeHistory marketGradeHistory) {
+        //select bonus amount of active positions
+        //todo:maybe extract general method - > getRules()
+        List<GradeRuleResponse> rules = gradeRuleRepository
+                .findByGradeIdAndMarketId(marketGradeHistory.getGrade().getId(),
+                        marketGradeHistory.getMarket().getId());
+
+        //select employeeIds from rules
+        List<Long> employeeIds = collectEmployeeIds(rules);
+
+        //todo:maybe extract general method - > getContractMap()
+        Map<Long, EmployerContract> contractMap = employerContractRepository
+                .findAllByEmployerIdInAndIsActive(employeeIds, true).stream()
+                .collect(Collectors.toMap(c -> c.getEmployer().getId(), Function.identity()));
+
+        //todo:maybe extract general method - > getEmployerMap()
+        Map<Long, Employer> employerMap = employerRepository.findAllById(employeeIds)
+                .stream()
+                .collect(Collectors.toMap(Employer::getId, e -> e));
+
+        List<EmployerContractResponse> employerContractResponses = rules.stream()
+                .map(rule -> mapToResponse(contractMap.get(rule.getEmployeeId()), rule.getBonusAmount(), rule.getGradeId()))
+                .toList();
+
+        //extract method,because all methods used this.
+        saveGradeHistories(employerContractResponses, employerMap);
+    }
+
+    private void handleThresholdGrade(MarketGradeHistory marketGradeHistory, BigDecimal totalSale) {
+        log.info("handleThresholdGrade method was started");
+        List<EmployerContractResponse> employerContractResponses = new ArrayList<>();
+
+        int totalCountOfEmployer = employerContractRepository
+                .countByMarketIdAndIsActive(marketGradeHistory.getMarket().getId(), true);
+
+        //calculate middle threshold
+        BigDecimal middleThreshold = calculateMiddleThreshold(marketGradeHistory.getMinThreshold(),
+                marketGradeHistory.getMaxThreshold());
+
+        //calculate percent
+        BigDecimal percent = calculateThresholdPercent(totalSale,
+                marketGradeHistory, middleThreshold);
+
+        //calculate new amount with new percent
+        BigDecimal fixAmount = totalSale.multiply(
+                percent.divide(BigDecimal.valueOf(100),
+                        4, RoundingMode.HALF_UP));
+
+        //calculate bonus amount for each employee
+        BigDecimal bonusAmountPerEmployee = fixAmount.divide(
+                BigDecimal.valueOf(totalCountOfEmployer),
+                2,
+                RoundingMode.HALF_UP
+        );
+
+        List<EmployerContractResponse> employerContracts = employerContractRepository
+                .findAllByMarketIdAndIsActive(marketGradeHistory.getMarket().getId(), true);
+
+        //todo:maybe change to stream api format line 163-182,but my opinion this format more readable
+        for (EmployerContractResponse updateContractResponse : employerContracts) {
+            BigDecimal baseSalary = Optional.ofNullable(updateContractResponse.getBaseSalary()).orElse(BigDecimal.ZERO);
+
+            updateContractResponse.setBonusAmount(bonusAmountPerEmployee);
+
+            updateContractResponse.setTotalAmount(baseSalary.add(bonusAmountPerEmployee));
+
+            employerContractResponses.add(updateContractResponse);
+        }
+
+        List<Long> employeeIds = employerContractResponses.stream()
+                .map(EmployerContractResponse::getEmployerId)
+                .distinct()
+                .toList();
+
+        Map<Long, Employer> employerMap = employerRepository.findAllById(employeeIds)
+                .stream()
+                .collect(Collectors.toMap(Employer::getId, e -> e));
+
+        saveGradeHistories(employerContractResponses, employerMap);
+    }
+
+    public EmployerContractResponse mapToResponse(EmployerContract contract, BigDecimal bonus, Long gradeId) {
+        BigDecimal baseSalary = Optional.ofNullable(contract.getBaseSalary())
+                .orElse(BigDecimal.ZERO);
+        return EmployerContractResponse.builder()
+                .totalAmount(baseSalary.add(bonus))
+                .baseSalary(baseSalary)
+                .employerId(contract.getEmployer().getId())
+                .gradeId(gradeId)
+                .positionId(contract.getPosition().getId())
+                .marketId(contract.getMarket().getId())
+                .bonusAmount(bonus)
+                .currency(contract.getCurrency())
+                .validFrom(contract.getValidFrom())
+                .validTo(contract.getValidTo())
+                .build();
+    }
+
+    private BigDecimal calculateThresholdPercent(BigDecimal totalSale, MarketGradeHistory marketGradeHistory, BigDecimal middleThreshold) {
+        log.info("calculateThresholdPercent method was started"); //todo: AOP logging
+        BigDecimal percent = BigDecimal.ZERO;
+        if (totalSale.compareTo(marketGradeHistory.getMinThreshold()) >= 0 && totalSale.compareTo(middleThreshold) <= 0) {
+            percent = marketGradeHistory.getGrade().getMinPercent();
+        } else if (totalSale.compareTo(middleThreshold) > 0 && totalSale.compareTo(marketGradeHistory.getMaxThreshold()) <= 0) {
+            percent = middleThreshold;
+        } else if (totalSale.compareTo(marketGradeHistory.getMaxThreshold()) > 0) {
+            percent = marketGradeHistory.getGrade().getMaxPercent();
+        }
+        return percent;
+
+    }
+
+    public BigDecimal calculateMiddleThreshold(BigDecimal a, BigDecimal b) {
+        return a.add(b).divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+    }
+
+    public List<Long> collectEmployeeIds(List<GradeRuleResponse> gradeRules) {
+        return gradeRules.stream()
+                .map(GradeRuleResponse::getEmployeeId)
+                .distinct()
+                .toList();
+    }
+
+    private BigDecimal calculateSalesOfMarket(Long marketId, LocalDate startDate) {
         return saleRepository.sumPriceByMarketIdAndDate(marketId,
                 startDate);
     }
 
-    public void saveGradeHistories(List<EmployerContractResponse> responses, Map<Long, Employer> employerMap) {
+    private void saveGradeHistories(List<EmployerContractResponse> responses, Map<Long, Employer> employerMap) {
         List<GradeHistory> histories = responses.stream().map(res -> {
             GradeHistory history = new GradeHistory();
             history.setEmployer(employerMap.get(res.getEmployerId()));
@@ -357,18 +302,14 @@ public class GradeServiceImpl implements GradeService {
             history.setTotalSalary(res.getTotalAmount());
             history.setPaidAt(LocalDateTime.now());
             history.setPeriod("MONTHLY");
-
-            log.info("histories after : {}",history);
-
-
             return history;
 
 
         }).toList();
-
-
         gradeHistoryRepository.saveAll(histories);
+    }
 
-//        log.info("history : {}", histories);
+    public Optional<MarketGradeHistory> checkActiveGradeOfMarket(Long marketId, boolean isActive) {
+        return marketGradeHistoryRepository.findByMarketIdAndIsActive(marketId, isActive);
     }
 }
