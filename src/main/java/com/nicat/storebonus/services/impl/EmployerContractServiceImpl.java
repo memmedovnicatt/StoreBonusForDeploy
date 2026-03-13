@@ -4,13 +4,11 @@ import com.nicat.storebonus.dtos.request.EmployerContractRequest;
 import com.nicat.storebonus.entities.Employer;
 import com.nicat.storebonus.entities.EmployerContract;
 import com.nicat.storebonus.entities.Market;
-import com.nicat.storebonus.entities.Position;
 import com.nicat.storebonus.mapper.EmployerContractMapper;
 import com.nicat.storebonus.repositories.EmployerContractRepository;
 import com.nicat.storebonus.services.EmployerContractService;
 import com.nicat.storebonus.services.EmployerService;
 import com.nicat.storebonus.services.MarketService;
-import com.nicat.storebonus.services.PositionService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -29,7 +27,7 @@ public class EmployerContractServiceImpl implements EmployerContractService {
     EmployerContractMapper employerContractMapper;
 
     @Override
-    public void create(EmployerContractRequest employerContractRequest) {
+    public void createContract(EmployerContractRequest employerContractRequest) {
         log.info("create method basladi ");
 
         Market market = marketService

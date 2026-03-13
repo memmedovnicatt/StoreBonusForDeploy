@@ -1,5 +1,6 @@
 package com.nicat.storebonus.services.impl;
 
+import com.nicat.storebonus.dtos.request.EmployerContractRequest;
 import com.nicat.storebonus.dtos.request.EmployerRequest;
 import com.nicat.storebonus.entities.Employer;
 import com.nicat.storebonus.entities.Position;
