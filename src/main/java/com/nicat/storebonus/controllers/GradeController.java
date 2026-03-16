@@ -4,6 +4,7 @@ import com.nicat.storebonus.dtos.request.GradeCalculationRequest;
 import com.nicat.storebonus.dtos.request.GradeRequest;
 import com.nicat.storebonus.dtos.request.GradeRuleRequest;
 import com.nicat.storebonus.dtos.response.ApiResponse;
+import com.nicat.storebonus.dtos.response.MarketGradeHistoryResponse;
 import com.nicat.storebonus.dtos.response.ResponseMessage;
 import com.nicat.storebonus.services.GradeRuleService;
 import com.nicat.storebonus.services.GradeService;
@@ -13,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/grades")
@@ -39,5 +42,11 @@ public class GradeController {
     public ResponseEntity<ApiResponse<Void>> createGradePositionBonus(@Valid @RequestBody GradeRuleRequest gradeRuleRequest) {
         gradeRuleService.create(gradeRuleRequest);
         return ResponseEntity.ok(ApiResponse.success(null, ResponseMessage.SUCCESS_CREATE));
+    }
+
+    @GetMapping("/histories")
+    public ResponseEntity<ApiResponse<List<MarketGradeHistoryResponse>>> getAll() {
+        List<MarketGradeHistoryResponse> marketGradeHistoryResponse = gradeService.getAll();
+        return ResponseEntity.ok(ApiResponse.success(marketGradeHistoryResponse, ResponseMessage.SUCCESS_FETCH));
     }
 }

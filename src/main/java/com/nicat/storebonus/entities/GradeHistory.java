@@ -23,7 +23,7 @@ public class GradeHistory extends BaseEntity {
 
     //employee_id
     @ManyToOne
-    @JoinColumn(name = "grade_histories")
+    @JoinColumn(name = "employer_id")
     Employer employer;
 
     BigDecimal baseSalary;

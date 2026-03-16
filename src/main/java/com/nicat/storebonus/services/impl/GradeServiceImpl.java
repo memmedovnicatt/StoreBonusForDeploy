@@ -3,11 +3,12 @@ package com.nicat.storebonus.services.impl;
 import com.nicat.storebonus.dtos.request.GradeCalculationRequest;
 import com.nicat.storebonus.dtos.request.GradeRequest;
 import com.nicat.storebonus.dtos.response.EmployerContractResponse;
+import com.nicat.storebonus.dtos.response.MarketGradeHistoryResponse;
 import com.nicat.storebonus.dtos.response.GradeRuleResponse;
 import com.nicat.storebonus.entities.*;
-import com.nicat.storebonus.enums.GradeType;
 import com.nicat.storebonus.exceptions.handler.ResourceNotFoundException;
 import com.nicat.storebonus.exceptions.handler.TargetNotReachedException;
+import com.nicat.storebonus.mapper.GradeHistoryMapper;
 import com.nicat.storebonus.repositories.*;
 import com.nicat.storebonus.services.GradeService;
 import lombok.AccessLevel;
@@ -39,6 +40,7 @@ public class GradeServiceImpl implements GradeService {
     EmployerContractRepository employerContractRepository;
     EmployerRepository employerRepository;
     GradeHistoryRepository gradeHistoryRepository;
+    GradeHistoryMapper gradeHistoryMapper;
 
     @Override
     public void create(GradeRequest gradeRequest) {
@@ -62,7 +64,8 @@ public class GradeServiceImpl implements GradeService {
     public void calculateGrade(GradeCalculationRequest gradeCalculationRequest) {
         StopWatch watch = new StopWatch();
         watch.start();
-        log.info("calculateGrade method was started with marketId: {}", gradeCalculationRequest.marketId());
+        log.info("calculateGrade method was started with marketId: {}",
+                gradeCalculationRequest.marketId());
 
         Optional<MarketGradeHistory> optional =
                 checkActiveGradeOfMarket(gradeCalculationRequest.marketId(), true);
@@ -71,30 +74,35 @@ public class GradeServiceImpl implements GradeService {
         if (optional.isPresent()) {
             MarketGradeHistory marketGradeHistory = optional.get();
 
+            if (marketGradeHistory.getGrade() == null) {
+                throw new ResourceNotFoundException("Grade", "id", marketGradeHistory.getGrade());
+            }
+
             //show that external method,because all types of grade utilized it
             BigDecimal totalSale = calculateSalesOfMarket(marketGradeHistory.getMarket().getId(),
                     marketGradeHistory.getStartDate());
+            log.debug("Market's total sale is :{}", totalSale);
 
-            //check total sales of market,if conditions are true,the code will not be executed
-            //todo:extract general method
-            if (totalSale.compareTo(marketGradeHistory.getMinThreshold()) <= 0) {
-                throw new TargetNotReachedException("Market", "min threshold",
-                        marketGradeHistory.getMinThreshold());
-            }
+            //compare total sale compare to null and zero
+            validateTotalSale(totalSale);
 
-            //todo:extract general method
-            GradeType gradeType = marketGradeHistory.getGrade().getGradeType();
-            switch (gradeType) {
-                case Fixed -> handleFixedGrade(marketGradeHistory);
-                case Threshold -> handleThresholdGrade(marketGradeHistory, totalSale);
-                case Percent -> handlePercentGrade(marketGradeHistory, totalSale);
-            }
+            //check type of grade and execute it
+            processGradeType(marketGradeHistory, totalSale);
 
         } else {
+            log.error("Calculation failed: No active grade found | marketId: {}", gradeCalculationRequest.marketId());
             throw new ResourceNotFoundException("Grade of market", "id", gradeCalculationRequest.marketId());
         }
         watch.stop();
         log.info("Calculate Grade method execution time: {} ms", watch.getTotalTimeMillis());
+    }
+
+    private void validateTotalSale(BigDecimal totalSale) {
+        //check total sales of market,if conditions are true,the code will not be executed
+        if (totalSale == null || totalSale.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Calculation aborted: Total sales are zero or null.");
+            throw new TargetNotReachedException("Market", "sales", BigDecimal.ZERO);
+        }
     }
 
     private void handlePercentGrade(MarketGradeHistory marketGradeHistory, BigDecimal totalSale) {
@@ -105,8 +113,6 @@ public class GradeServiceImpl implements GradeService {
                         marketGradeHistory.getMarket().getId());
 
         List<Long> employeeIds = collectEmployeeIds(rules);
-
-        Long marketId = marketGradeHistory.getMarket().getId();
 
         int totalStaff = employerContractRepository
                 .countByMarketIdAndIsActive(marketGradeHistory.getMarket().getId(), true);
@@ -121,7 +127,8 @@ public class GradeServiceImpl implements GradeService {
                 .map(GradeRuleResponse::getBonusPercent)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        List<EmployerContractResponse> nonSpecialResponses = calculateNonSpecialPercentBonus(marketGradeHistory, fixAmount, distributedPercent, employeeIds, totalStaff);
+        List<EmployerContractResponse> nonSpecialResponses =
+                calculateNonSpecialPercentBonus(marketGradeHistory, fixAmount, distributedPercent, employeeIds, totalStaff);
 
         List<EmployerContractResponse> allResponses = new ArrayList<>(specialResponses);
         allResponses.addAll(nonSpecialResponses);
@@ -129,15 +136,13 @@ public class GradeServiceImpl implements GradeService {
         saveGradeHistories(allResponses, getEmployerMap(allResponses.stream().map(EmployerContractResponse::getEmployerId).toList()));
     }
 
-    private Map<Long, Employer> getEmployerMap(List<Long> ids) {
-        return employerRepository.findAllById(ids).stream()
-                .collect(Collectors.toMap(Employer::getId, e -> e));
-    }
-
-
-    private Map<Long, EmployerContract> getContractMap(List<Long> ids) {
-        return employerContractRepository.findAllByEmployerIdInAndIsActive(ids, true).stream()
-                .collect(Collectors.toMap(c -> c.getEmployer().getId(), Function.identity()));
+    private void processGradeType(MarketGradeHistory marketGradeHistory, BigDecimal totalSale) {
+        log.debug("Type of grade is : {}", marketGradeHistory.getGrade().getGradeType());
+        switch (marketGradeHistory.getGrade().getGradeType()) {
+            case Fixed -> handleFixedGrade(marketGradeHistory);
+            case Threshold -> handleThresholdGrade(marketGradeHistory, totalSale);
+            case Percent -> handlePercentGrade(marketGradeHistory, totalSale);
+        }
     }
 
 
@@ -175,22 +180,38 @@ public class GradeServiceImpl implements GradeService {
         //select employeeIds from rules
         List<Long> employeeIds = collectEmployeeIds(rules);
 
-        //todo:maybe extract general method - > getContractMap()
-        Map<Long, EmployerContract> contractMap = employerContractRepository
-                .findAllByEmployerIdInAndIsActive(employeeIds, true).stream()
-                .collect(Collectors.toMap(c -> c.getEmployer().getId(), Function.identity()));
+        //getEmployees together ID
+        Map<Long, Employer> employerMap = getEmployerMap(employeeIds);
 
-        //todo:maybe extract general method - > getEmployerMap()
-        Map<Long, Employer> employerMap = employerRepository.findAllById(employeeIds)
-                .stream()
-                .collect(Collectors.toMap(Employer::getId, e -> e));
+        //getContracts of employees which belong to rules
+        Map<Long, EmployerContract> contractMap = getContractMap(employeeIds);
 
         List<EmployerContractResponse> employerContractResponses = rules.stream()
                 .map(rule -> mapToResponse(contractMap.get(rule.getEmployeeId()), rule.getBonusAmount(), rule.getGradeId()))
                 .toList();
 
+        log.debug("EmployerContractResponses : {}", employerContractResponses);
+
         //extract method,because all methods used this.
         saveGradeHistories(employerContractResponses, employerMap);
+
+        log.debug("Grades was successfully saved in GradeHistory");
+    }
+
+    private Map<Long, Employer> getEmployerMap(List<Long> ids) {
+        Map<Long, Employer> employerMap = employerRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(Employer::getId, e -> e));
+        log.debug("EmployerMap : {}", employerMap);
+        return employerMap;
+    }
+
+
+    private Map<Long, EmployerContract> getContractMap(List<Long> ids) {
+        Map<Long, EmployerContract> employerContractMap = employerContractRepository
+                .findAllByEmployerIdInAndIsActive(ids, true).stream()
+                .collect(Collectors.toMap(c -> c.getEmployer().getId(), Function.identity()));
+        log.debug("EmployerContract : {}", employerContractMap);
+        return employerContractMap;
     }
 
     private void handleThresholdGrade(MarketGradeHistory marketGradeHistory, BigDecimal totalSale) {
@@ -301,15 +322,24 @@ public class GradeServiceImpl implements GradeService {
             history.setBonusAmount(res.getBonusAmount());
             history.setTotalSalary(res.getTotalAmount());
             history.setPaidAt(LocalDateTime.now());
-            history.setPeriod("MONTHLY");
+            history.setPeriod("MONTHLY");//
             return history;
-
-
         }).toList();
         gradeHistoryRepository.saveAll(histories);
+        log.debug("All grades were saved");
     }
 
     public Optional<MarketGradeHistory> checkActiveGradeOfMarket(Long marketId, boolean isActive) {
         return marketGradeHistoryRepository.findByMarketIdAndIsActive(marketId, isActive);
+    }
+
+    @Override
+    public List<MarketGradeHistoryResponse> getAll() {
+        log.debug("getAll method was started for GradeService");
+        List<GradeHistory> gradeHistories = gradeHistoryRepository.findAll();
+
+        log.debug("gradeHistories :{} ", gradeHistories.size());
+
+        return gradeHistoryMapper.toListGradeHistory(gradeHistories);
     }
 }
