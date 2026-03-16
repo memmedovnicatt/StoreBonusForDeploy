@@ -7,4 +7,5 @@ import org.springframework.stereotype.Service;
 @Service
 public interface EmployerContractService {
     void createContract(@Valid EmployerContractRequest employerContractRequest);
+    void deactivateEmployee(Long employeeId);
 }

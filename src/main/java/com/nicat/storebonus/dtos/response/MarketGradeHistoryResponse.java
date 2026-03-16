@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 public record MarketGradeHistoryResponse(
         String employerName,
         String employerSurname,
-//        String marketName,
+        String marketName,
         BigDecimal baseSalary,
         BigDecimal bonusAmount,
         BigDecimal totalSalary,

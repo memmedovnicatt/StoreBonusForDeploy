@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import javax.swing.text.html.Option;
 import java.util.List;
+import java.util.Optional;
 
 public interface EmployerContractRepository extends JpaRepository<EmployerContract, Long> {
     List<EmployerContract> findAllByEmployerIdInAndIsActive(List<Long> employeeIds, boolean isActive);
@@ -55,4 +57,8 @@ public interface EmployerContractRepository extends JpaRepository<EmployerContra
             AND e.isActive=true
             """)
     List<EmployerContractResponse> findAllByMarketIdAndIsActive(Long marketId,boolean isActive);
+
+    Optional<EmployerContract> findByEmployerIdAndIsActive(Long employeeId, boolean isActive);
+
+    List<EmployerContract> findByLeavingDateIsNotNull();
 }

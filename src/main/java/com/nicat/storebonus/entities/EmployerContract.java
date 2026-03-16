@@ -6,7 +6,6 @@ import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Date;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -20,6 +19,7 @@ public class EmployerContract extends BaseEntity {
     LocalDate validFrom;
 
     LocalDate validTo;
+    LocalDate leavingDate; //also include here transfer from one market to another market
 
     BigDecimal baseSalary;
     String currency;

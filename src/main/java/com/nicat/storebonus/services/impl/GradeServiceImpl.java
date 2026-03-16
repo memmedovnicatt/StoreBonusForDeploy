@@ -41,6 +41,7 @@ public class GradeServiceImpl implements GradeService {
     EmployerRepository employerRepository;
     GradeHistoryRepository gradeHistoryRepository;
     GradeHistoryMapper gradeHistoryMapper;
+    private final MarketRepository marketRepository;
 
     @Override
     public void create(GradeRequest gradeRequest) {
@@ -133,7 +134,7 @@ public class GradeServiceImpl implements GradeService {
         List<EmployerContractResponse> allResponses = new ArrayList<>(specialResponses);
         allResponses.addAll(nonSpecialResponses);
 
-        saveGradeHistories(allResponses, getEmployerMap(allResponses.stream().map(EmployerContractResponse::getEmployerId).toList()));
+        saveGradeHistories(allResponses, getEmployerMap(allResponses.stream().map(EmployerContractResponse::getEmployerId).toList()), marketGradeHistory.getMarket().getId());
     }
 
     private void processGradeType(MarketGradeHistory marketGradeHistory, BigDecimal totalSale) {
@@ -193,7 +194,7 @@ public class GradeServiceImpl implements GradeService {
         log.debug("EmployerContractResponses : {}", employerContractResponses);
 
         //extract method,because all methods used this.
-        saveGradeHistories(employerContractResponses, employerMap);
+        saveGradeHistories(employerContractResponses, employerMap, marketGradeHistory.getMarket().getId());
 
         log.debug("Grades was successfully saved in GradeHistory");
     }
@@ -264,7 +265,7 @@ public class GradeServiceImpl implements GradeService {
                 .stream()
                 .collect(Collectors.toMap(Employer::getId, e -> e));
 
-        saveGradeHistories(employerContractResponses, employerMap);
+        saveGradeHistories(employerContractResponses, employerMap, marketGradeHistory.getMarket().getId());
     }
 
     public EmployerContractResponse mapToResponse(EmployerContract contract, BigDecimal bonus, Long gradeId) {
@@ -314,12 +315,14 @@ public class GradeServiceImpl implements GradeService {
                 startDate);
     }
 
-    private void saveGradeHistories(List<EmployerContractResponse> responses, Map<Long, Employer> employerMap) {
+    private void saveGradeHistories(List<EmployerContractResponse> responses, Map<Long, Employer> employerMap, Long marketId) {
+        Market currentMarket = marketRepository.getReferenceById(marketId);
         List<GradeHistory> histories = responses.stream().map(res -> {
             GradeHistory history = new GradeHistory();
             history.setEmployer(employerMap.get(res.getEmployerId()));
             history.setBaseSalary(res.getBaseSalary());
             history.setBonusAmount(res.getBonusAmount());
+            history.setMarket(currentMarket);
             history.setTotalSalary(res.getTotalAmount());
             history.setPaidAt(LocalDateTime.now());
             history.setPeriod("MONTHLY");//
