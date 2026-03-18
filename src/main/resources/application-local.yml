@@ -4,9 +4,9 @@ server:
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    username: postgres
-    password: root
-    url: jdbc:postgresql://localhost:5432/StoreBonusDb
+    username: dpg-d6t3rv6uk2gs738jdbe0-a.frankfurt-postgres.render.com
+    password: eZzkPfkG6AzsscYGCU3KVYAdv5Vj7Zzm
+    url: jdbc:postgresql://dpg-d6t3rv6uk2gs738jdbe0-a.frankfurt-postgres.render.com:5432/postgre_sql_public_url
 
   jpa:
     hibernate:
