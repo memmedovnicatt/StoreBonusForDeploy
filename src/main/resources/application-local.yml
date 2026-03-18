@@ -4,14 +4,12 @@ server:
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    username: dpg-d6t3rv6uk2gs738jdbe0-a.frankfurt-postgres.render.com
+    username: postgre_sql_public_url_user   # burada DB username olmalıdır
     password: eZzkPfkG6AzsscYGCU3KVYAdv5Vj7Zzm
     url: jdbc:postgresql://dpg-d6t3rv6uk2gs738jdbe0-a.frankfurt-postgres.render.com:5432/postgre_sql_public_url
-
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
     properties:
       hibernate:
-        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
